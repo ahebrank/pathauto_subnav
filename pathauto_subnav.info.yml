@@ -1,0 +1,5 @@
+name: Pathauto Subnav
+type: module
+description: Generate subsection navigation based on aliases
+core: 8.x
+package: NewCity
