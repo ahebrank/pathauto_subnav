@@ -2,8 +2,7 @@
 
 namespace Drupal\pathauto_subnav\Plugin\Block;
 
-use Drupal\Core\Block\BlockBase;
-use Drupal\Core\Session\AccountInterface;
+use Drupal\pathauto_subnav\Plugin\Block\NavBlockBase;
 
 /**
  * Provides a 'Sidenav' block.
@@ -13,28 +12,17 @@ use Drupal\Core\Session\AccountInterface;
  *  admin_label = @Translation("Sidenav block")
  * )
  */
-class SidenavBlock extends BlockBase {
-
-  var $menu = null;
-  var $parent = null;
+class SidenavBlock extends NavBlockBase {
 
   // filter out content types except for these (usually)
-  var $included_types = ['generic', 'landing', 'redirect'];
-
-
-  /**
-   * {@inheritdoc}
-   */
-  public function access(AccountInterface $account, $return_as_object = false) {
-    return $account->hasPermission('access content');
-  }
+  var $parent = null;
 
   /**
    * {@inheritdoc}
    */
   public function build() {
-    $this->makeMenu();
-    $items = array_map([$this, 'linkMarkup'], $this->menu);
+    $menu = $this->makeMenu();
+    $items = array_map([$this, 'linkMarkup'], $menu);
 
     $output = [
       '#cache' => [
@@ -44,7 +32,7 @@ class SidenavBlock extends BlockBase {
 
     if ($this->parent) {
       $output['parent'] = $this->linkMarkup($this->parent, 'back-link');
-      $output['hr'] = [
+      $output['top_hr'] = [
         '#markup' => '<hr>'
       ];
     }
@@ -77,11 +65,19 @@ class SidenavBlock extends BlockBase {
     }
 
     $siblings = [];
+    $title = '';
 
-    $node = \Drupal::routeMatch()->getParameter('node');
+    $node = $this->getNode();
+    if ($node) {
+      $title = $node->get('title');
+      if ($title) {
+        $title = $title->value;
+      }
+    }
+
     $current_page = [
       'url' => $current,
-      'title' => $node->getTitle(),
+      'title' => $title,
       'current' => TRUE,
     ];
     $current_page_pid = 0;
@@ -107,7 +103,7 @@ class SidenavBlock extends BlockBase {
           $current_page['children'] = [];
         }
         $current_page['children'][$record->pid] = [
-          'title' => $this->getTitleFromPath($record->source, $this->included_types),
+          'title' => $this->getTitleFromPath($record->source),
           'url' => $record->alias,
           ];
       }
@@ -116,7 +112,7 @@ class SidenavBlock extends BlockBase {
         // second level or below
         if (strpos($record->alias, $parent . '/')===0 && $n == $record_n) {
           $siblings[$record->pid] = [
-              'title' => $this->getTitleFromPath($record->source, $this->included_types),
+              'title' => $this->getTitleFromPath($record->source),
               'url' => $record->alias,
             ];
         }
@@ -125,7 +121,7 @@ class SidenavBlock extends BlockBase {
         // top level
         if ($record_n == 1) {
           $siblings[$record->pid] = [
-              $this->getTitleFromPath($record->source, $this->included_types),
+              $this->getTitleFromPath($record->source),
               'url' => $record->alias,
             ];
         }
@@ -138,58 +134,7 @@ class SidenavBlock extends BlockBase {
     $siblings[$current_page_pid] = $current_page;
     usort($siblings, [$this, 'sortNav']);
 
-    $this->menu = $siblings;
+    return $siblings;
   }
 
-  
-  /**
-   * look up a title from a path
-   * @param  str $path [description]
-   * @param  arr $included_types optionally filter down to certain content types
-   * @return [type]       [description]
-   */
-  private function getTitleFromPath($path, $included_types = null) {
-    $params = \Drupal\Core\Url::fromUserInput($path)->getRouteParameters();
-    if (isset($params['node'])) {
-      $node = \Drupal\node\Entity\Node::load($params['node']);
-      if ($node) {
-        if (!is_array($included_types) || in_array($node->getType(), $included_types)) {
-          return $node->getTitle();
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * sort the nav alphabetically
-   * @param  [type] $a [description]
-   * @param  [type] $b [description]
-   * @return [type]    [description]
-   */
-  private function sortNav($a, $b) {
-    return strnatcmp($a['title'], $b['title']);
-  }
-
-  /** 
-   * render array for a link
-   * @param  arr $item thing with a title and a url
-   * @return arr
-   */
-  private function linkMarkup($item, $classes = '') {
-    $markup = '<a class="' . $classes . '" href="' . $item['url'] . '">' . $item['title'] . '</a>';
-    $output = ['#markup' => $markup];
-    if (isset($item['current']) && $item['current']) {
-      $output['#wrapper_attributes']['class'][] = 'active';
-    }
-    if (isset($item['children']) && count($item['children']) > 0) {
-      $output['childnav'] = [
-        '#items' => array_map([$this, 'linkMarkup'], $item['children']),
-        '#theme' => 'item_list',
-        '#list_type' => 'ul',
-        ];
-      $output['#wrapper_attributes']['class'][] = 'has-children';
-    }
-    return $output;
-  }
 }
