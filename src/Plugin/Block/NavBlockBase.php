@@ -4,6 +4,7 @@ namespace Drupal\pathauto_subnav\Plugin\Block;
 
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Access\AccessResult;
 
 /**
  * Inheritable nav block
@@ -14,8 +15,8 @@ abstract class NavBlockBase extends BlockBase {
   /**
    * {@inheritdoc}
    */
-  public function access(AccountInterface $account, $return_as_object = false) {
-    return $account->hasPermission('access content');
+  public function blockAccess(AccountInterface $account) {
+   return $account->hasPermission('access content')? AccessResult::allowed() : AccessResult::forbidden();
   }
 
   /**
@@ -59,7 +60,7 @@ abstract class NavBlockBase extends BlockBase {
     return strnatcmp($a['title'], $b['title']);
   }
 
-  /** 
+  /**
    * render array for a link
    * @param  arr $item thing with a title and a url
    * @return arr
